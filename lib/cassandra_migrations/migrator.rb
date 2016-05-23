@@ -1,4 +1,5 @@
 # encoding: utf-8
+require "pry"
 
 module CassandraMigrations
   module Migrator
@@ -9,6 +10,7 @@ module CassandraMigrations
       current_version = read_current_version
 
       new_migrations = get_all_migration_names.sort.select do |migration_name|
+        raise Errors::MigrationNamingError, "Migration file names must start with a numeric version prefix" unless validate_migration_version(migration_name)
         get_version_from_migration_name(migration_name) > current_version
       end
 
@@ -52,6 +54,10 @@ module CassandraMigrations
 
 private
 
+    def self.validate_migration_version(migration_name)
+      migration_name.match(/\/\d+_.*$/)
+    end
+
     def self.up(migration_name)
       # load migration
       require migration_name
@@ -63,6 +69,7 @@ private
     end
 
     def self.down(migration_name, previous_migration_name=nil)
+      raise Errors::MigrationNamingError, "Migration file names must start with a numeric version prefix" unless validate_migration_name(migration_name)
       # load migration
       require migration_name
       # run migration
@@ -81,11 +88,12 @@ private
     end
 
     def self.get_class_from_migration_name(filename)
-      filename.match(/[0-9]{14}_(.+)\.rb$/).captures.first.camelize.constantize
+      migration_name = filename.match(/[0-9]+_(.+)\.rb$/).captures.first.camelize
+      migration_name.constantize
     end
 
     def self.get_version_from_migration_name(migration_name)
-      migration_name.match(/([0-9]{14})_.+\.rb$/).captures.first.to_i
+      migration_name.match(/([0-9]+)_.+\.rb$/).captures.first.to_i
     end
   end
 end
